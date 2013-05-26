@@ -47,7 +47,7 @@ if [ -f ${BUILD_DIR}/system.properties ]; then
 fi
 
 
-VERTX_URL="http://vert-x.github.io/vertx-downloads/downloads/vert.x-2.0.0-beta2.tar.gz"
+VERTX_URL="http://vert-x.github.io/vertx-downloads/downloads/vert.x-1.3.1.final.tar.gz"
 
 if [ -d "$CACHE_DIR/.vertx" ]; then
   echo -n "copying vertx to app instead of downloading"
