@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # bin/use <build-dir>
 
-if [ -f $1/server.js ]; then
-   echo "Vert.x 2.0.0-beta2 JavaScript app" && exit 0
+# Warn if no Procfile is present
+if [ ! -f Procfile ]; then
+  echo "-----> No Procfile found. Create a Procfile in the root of your app folder that calls vertx like so:"
+  echo "       web: vertx run YourServer.java"
 else
-  echo "no" && exit 1
+  echo "Vert.x" && exit 0
 fi

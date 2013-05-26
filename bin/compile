@@ -4,68 +4,65 @@
 # fail fast
 set -e
 
+logger -p user.notice -t "slugc[$$]" "language_pack_java java_compile_start"
+
 BIN_DIR=$(cd $(dirname $0); pwd) # absolute path
 # parse args
 BUILD_DIR=$1
 CACHE_DIR=$2
+LOGGER_FLAGS=""
+
+curl --silent --location http://heroku-jvm-common.s3.amazonaws.com/jvm-buildpack-common.tar.gz | tar xz
+. bin/java
+
+# create default system.properties for apps that had the jdk vendored in 
+if [ -f ${CACHE_DIR}/.jdk/vendor ] && [ ! -f ${BUILD_DIR}/system.properties ]; then
+  echo "java.runtime.version=1.7" > ${BUILD_DIR}/system.properties
+fi
+
+if [ -f ${CACHE_DIR}/system.properties ] && [ ! -f ${BUILD_DIR}/system.properties ]; then
+  cp ${CACHE_DIR}/system.properties ${BUILD_DIR}/system.properties
+fi
+
+if [ ! -d $CACHE_DIR ]; then
+  LOGGER_FLAGS="$LOGGER_FLAGS new_java_app"
+  logger -p user.notice -t "slugc[$$]" "language_pack_java new_java_app"
+  if [ ! -f ${BUILD_DIR}/system.properties ]; then 
+    echo "java.runtime.version=1.7" > ${BUILD_DIR}/system.properties; 
+  fi
+fi
 
 #create the cache dir if it doesn't exist
 mkdir -p $CACHE_DIR
 
-cd $BUILD_DIR
-if [ -d "$CACHE_DIR/.jdk7" ]; then
-  echo -n "copying jdk to app"
-  cp -r "$CACHE_DIR/.jdk7" $BUILD_DIR
+# install JDK 
+if [ -f ${BUILD_DIR}/system.properties ]; then
+  logger -p user.notice -t "slugc[$$]" "language_pack_java download_jdk"
+  LOGGER_FLAGS="$LOGGER_FLAGS download_jdk"
+  javaVersion=$(detect_java_version ${BUILD_DIR})
+  echo -n "-----> Installing OpenJDK ${javaVersion}..."
+  install_java ${BUILD_DIR} ${javaVersion}
   echo "done"
+  cp ${BUILD_DIR}/system.properties ${CACHE_DIR}/
 fi
 
-OPENJDK7_URL="https://s3.amazonaws.com/heroku-jvm-langpack-java/openjdk7-u2-heroku-temaki.tar.gz"
 
-if [ ! -d "$BUILD_DIR/.jdk7" ]; then
-  echo -n "-----> Installing OpenJDK7u2 build (to .jdk7)....."
-  mkdir "$BUILD_DIR/.jdk7"
-  cd "$BUILD_DIR/.jdk7"
-  curl --max-time 180 --location $OPENJDK7_URL | tar xz
-  cd $BUILD_DIR
-  cp -r .jdk7 $CACHE_DIR/.jdk7
-  echo " done"
-fi
+VERTX_URL="http://vert-x.github.io/vertx-downloads/downloads/vert.x-2.0.0-beta2.tar.gz"
 
 if [ -d "$CACHE_DIR/.vertx" ]; then
-  echo -n "copying vertx to app"
+  echo -n "copying vertx to app instead of downloading"
   cp -r "$CACHE_DIR/.vertx" $BUILD_DIR
   echo "done"
 fi
 
-VERTX_URL="http://vert-x.github.io/vertx-downloads/downloads/vert.x-2.0.0-beta2.tar.gz"
-
 if [ ! -d "$BUILD_DIR/.vertx" ]; then
+  cd $BUILD_DIR
   echo -n "-----> Installing Vert.x build (to .vertx)....."
   curl --max-time 320 --location $VERTX_URL | tar xz
   mv vert* .vertx
-  rm '.vertx/bin/vertx.bat'
-  cd $BUILD_DIR
   cp -r .vertx $CACHE_DIR/.vertx
-  echo " done"
+  echo "installed vert.x"
 fi
 
-cd $BUILD_DIR
 
-export JAVA_HOME="$BUILD_DIR/.jdk7"
-export VERTX_HOME="$BUILD_DIR/.vertx"
-export PATH=$PATH:$JAVA_HOME/bin:$VERTX_HOME/bin
-
-echo "Path is set to"
-echo $PATH
-
-if [ -f compile.sh ]; then
-    echo 'compile.sh file found, executing...'
-    chmod 700 compile.sh
-    ./compile.sh
-fi
-
-# Warn if no Procfile is present
-if [ ! -f Procfile ]; then
-  echo "-----> No Procfile found. Will use the following default process: "
-  echo "       vertx run server.js"
-fi
+logger -p user.notice -t "slugc[$$]" "language_pack_java java_compile_end $LOGGER_FLAGS"
